@@ -11,7 +11,7 @@ import {
   redactToolResult,
   redactTokens,
 } from '../lib/redact.js'
-import { apply } from '../index.js'
+import { DEFAULT_ENDPOINT, apply, resolveJudgeConfig } from '../index.js'
 
 /** A context that records listeners instead of mounting a Cordis runtime. */
 function fakeContext() {
@@ -407,4 +407,23 @@ test('the plugin passes unrelated results through unchanged', async () => {
     await handler(readExec('src/app.ts'), readResult([{ number: 1, text: 'const n = 1' }]), async () => inner),
     inner,
   )
+})
+
+test('volatile references are read through get()', () => {
+  // Loader hands a `.volatile()` field over as a live reference, not a value.
+  const ref = (value) => ({ get: () => value })
+  const resolved = resolveJudgeConfig({ judge: { enabled: ref(true), endpoint: ref('http://x/v1/systemone'), timeoutMs: ref(1500) } })
+  assert.deepEqual(resolved, { endpoint: 'http://x/v1/systemone', timeoutMs: 1500 })
+
+  assert.equal(resolveJudgeConfig({ judge: { enabled: ref(false) } }), undefined)
+  assert.equal(resolveJudgeConfig(undefined), undefined)
+  assert.equal(resolveJudgeConfig({}), undefined)
+})
+
+test('plain values and missing fields also resolve', () => {
+  assert.deepEqual(resolveJudgeConfig({ judge: { enabled: true } }), {
+    endpoint: DEFAULT_ENDPOINT,
+    timeoutMs: 3000,
+  })
+  assert.equal(resolveJudgeConfig({ judge: { enabled: 'yes' } }), undefined)
 })

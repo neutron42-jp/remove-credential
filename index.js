@@ -53,13 +53,50 @@ Dotenv files (\`.env\`, \`.env.*\`, \`*.env\`) are shown with every value replac
  * Register the result transform, the input guard, and the prompt explanation.
  * @param ctx - the plugin context; everything lives as long as the plugin.
  */
+/** Default endpoint when the config leaves it unset. */
+export const DEFAULT_ENDPOINT = 'http://127.0.0.1:8081/v1/systemone'
+
+/**
+ * Read one config field. Loader exposes a `.volatile()` field as a live
+ * reference with `get()`; a plain value is returned as-is so the same code works
+ * for a config resolved without the settings layer.
+ * @param judge - the `judge` section.
+ * @param field - field name.
+ * @param fallback - value used when the field is absent.
+ * @returns the current value.
+ */
+function readField(judge, field, fallback) {
+  const ref = judge?.[field]
+  if (ref === undefined || ref === null) return fallback
+  return typeof ref.get === 'function' ? ref.get() : ref
+}
+
+/**
+ * Resolve the judge settings from the live config.
+ * @param config - the plugin config; its `judge.enabled` may be a volatile reference.
+ * @returns the judge settings, or undefined when the judge is off.
+ */
+export function resolveJudgeConfig(config) {
+  const judge = config?.judge
+  if (readField(judge, 'enabled', false) !== true) return undefined
+  return {
+    endpoint: readField(judge, 'endpoint', DEFAULT_ENDPOINT),
+    timeoutMs: readField(judge, 'timeoutMs', 3000),
+  }
+}
+
 export function apply(ctx, config) {
-  const judgeConfig = config?.judge
-  const judge = judgeConfig?.enabled === true ? createJudge(judgeConfig) : undefined
+  // The judge fields are volatile, so Loader hands them over as live references:
+  // a Settings save updates the reference instead of restarting the plugin.
+  // Reading them per call keeps the saved values live.
+  const currentJudge = () => {
+    const judgeConfig = resolveJudgeConfig(config)
+    return judgeConfig === undefined ? undefined : createJudge(judgeConfig)
+  }
 
   ctx.on('tools/post-execute', async (exec, result, next) => {
     const decision = await next()
-    return (await redactToolResult(exec, result, decision, judge)) ?? decision
+    return (await redactToolResult(exec, result, decision, currentJudge())) ?? decision
   })
 
   // The prompt section is optional: a deployment without the system-prompt

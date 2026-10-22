@@ -63,9 +63,29 @@ plain=ok
 
 ## 判定モデルの併用（任意）
 
-設定で `judge.enabled` を入れると、正規表現が見つけた候補をローカルの Jev / d1（System One）に確認させる。4 択（資格情報 / ハッシュ / 識別子 / その他）で聞き、**確信を持って「資格情報ではない」と答えたときだけ**伏せ字を解除する。
+設定で判定モデルをオンにすると、正規表現が見つけた候補をローカルの Jev / d1（System One）に確認させる。4 択（資格情報 / ハッシュ / 識別子 / その他）で聞き、**確信を持って「資格情報ではない」と答えたときだけ**伏せ字を解除する。
 
-設定は **Plugins ページ → Remove Credential → 行の Configure** で編集する（`judge.*` は volatile フィールド）。
+### 設定画面
+
+**Plugins ページ → Remove Credential → 行の Configure**
+
+![設定画面: 検出方法の切り替えと System One エンドポイント](docs/settings.png)
+
+- **検出方法**: 「正規表現のみ」/「正規表現＋判定モデル」の 2 択
+- **System One エンドポイント**: d1 か Jev
+- **1 候補あたりのタイムアウト**
+- **保存**でプロファイルの patch に書かれ、**再起動なしで反映**される（`judge.*` は volatile フィールド）
+
+```yaml
+- id: remove-credential
+  config:
+    judge:
+      enabled: true
+      endpoint: http://127.0.0.1:8081/v1/systemone
+      timeoutMs: 3000
+```
+
+> 内部メモ: volatile フィールドは Loader から**参照（`get()`）**として渡り、保存時は再起動せず参照の中身が書き換わる。そのため設定は毎回 `get()` で読む（`resolveJudgeConfig`）。起動時に値で受け取ると、画面で切り替えても反映されない。
 
 | 設定 | 既定 | 意味 |
 |---|---|---|
@@ -81,8 +101,9 @@ P(資格情報) < 0.05 かつ max(P(ハッシュ), P(識別子), P(その他)) >
 
 - 迷ったら伏せる。ネットワーク失敗・異常応答・タイムアウトも伏せる
 - 判定モデルは候補を**追加できない**。正規表現が見つけたものを裁定するだけ
-- 実測: `sha256=sk_HDVL…`（正規表現の誤検知）は hash 0.97 で解除、`xai-…` の本物の鍵は 0.07 で条件に届かず伏せたまま
+- 実測: `sha256=sk_HDVL…`（正規表現の誤検知）は解除、`xai-…` の本物の鍵は条件に届かず伏せたまま
 - 1 候補 = 1 リクエスト（d1-3B で約 40ms）。候補が多いファイルは遅くなる
+- 実測（画面で切り替え、再起動なし）: 判定モデル ON → `sha256=sk_HDVL…` が素通り / OFF → 同じ行が伏せ字 / d1 停止中 → 伏せ字。
 
 ## インストール
 
@@ -101,7 +122,7 @@ plugin_manager install_bundle target=<clone したディレクトリの絶対パ
 ## テスト
 
 ```sh
-npm test                      # 43 テスト
+npm test                      # 45 テスト
 node scripts/scan.mjs ~/dev   # 誤検知スキャン（一致した値は出力しない）
 ```
 
@@ -119,7 +140,9 @@ node scripts/scan.mjs ~/dev   # 誤検知スキャン（一致した値は出力
 | `test/` | コーパスとユニットテスト |
 | `locale/{en,ja}.json` | プラグイン一覧の表示名と説明 |
 | `icon.svg` | アイコン |
+| `client.js` | 設定画面（`plugins.row.config`） |
 | `docs/before-after.png` | README の図（生成: `docs/diagram.py`） |
+| `docs/settings.png` | 設定画面のスクリーンショット |
 
 ## License
 
