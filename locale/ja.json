@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Remove Credential",
+    "description": ".env の値を消してキー名だけをモデルに渡します。"
+  }
+}

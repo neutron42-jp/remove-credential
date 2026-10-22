@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Remove Credential",
+    "description": "Shows .env files to the model with every value removed; only key names are returned."
+  }
+}
