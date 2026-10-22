@@ -13,7 +13,27 @@
  *
  * @module remove-credential
  */
+import z from '@deepseek-ai/schemastery'
+import { createJudge } from './lib/judge.js'
 import { redactToolResult } from './lib/redact.js'
+
+/**
+ * Plugin config. The judge is off by default: regex-only behavior is
+ * deterministic and needs no local server.
+ */
+export const Config = z.object({
+  judge: z
+    .object({
+      enabled: z.boolean().default(false),
+      endpoint: z.string().default('http://127.0.0.1:8081/v1/systemone'),
+      timeoutMs: z.natural().default(3000),
+    })
+    .default({
+      enabled: false,
+      endpoint: 'http://127.0.0.1:8081/v1/systemone',
+      timeoutMs: 3000,
+    }),
+})
 
 /** Placement used when the built-in `read` guidance is not registered. */
 const FALLBACK_ORDER = 1101
@@ -33,10 +53,13 @@ Dotenv files (\`.env\`, \`.env.*\`, \`*.env\`) are shown with every value replac
  * Register the result transform, the input guard, and the prompt explanation.
  * @param ctx - the plugin context; everything lives as long as the plugin.
  */
-export function apply(ctx) {
+export function apply(ctx, config) {
+  const judgeConfig = config?.judge
+  const judge = judgeConfig?.enabled === true ? createJudge(judgeConfig) : undefined
+
   ctx.on('tools/post-execute', async (exec, result, next) => {
     const decision = await next()
-    return redactToolResult(exec, result, decision) ?? decision
+    return (await redactToolResult(exec, result, decision, judge)) ?? decision
   })
 
   // The prompt section is optional: a deployment without the system-prompt

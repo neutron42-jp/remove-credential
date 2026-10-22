@@ -61,6 +61,27 @@ plain=ok
 6. PEM ブロックの途中から `offset` で読む場合
 7. 未対応形式: `AIza` / Slack `xox` / SendGrid `SG.` / Shopify `shpat_` / Stripe `rk_live_` / Vault / Databricks / Notion / JWT / Telegram bot / prefix 無しの AWS シークレット
 
+## 判定モデルの併用（任意）
+
+設定で `judge.enabled` を入れると、正規表現が見つけた候補をローカルの Jev / d1（System One）に確認させる。4 択（資格情報 / ハッシュ / 識別子 / その他）で聞き、**確信を持って「資格情報ではない」と答えたときだけ**伏せ字を解除する。
+
+| 設定 | 既定 | 意味 |
+|---|---|---|
+| `judge.enabled` | `false` | オフなら正規表現のみ（決定論的・サーバ不要） |
+| `judge.endpoint` | `http://127.0.0.1:8081/v1/systemone` | d1 / jev のエンドポイント |
+| `judge.timeoutMs` | `3000` | 1 候補あたりの予算 |
+
+解除の条件は非対称:
+
+```
+P(資格情報) < 0.05 かつ max(P(ハッシュ), P(識別子), P(その他)) >= 0.8
+```
+
+- 迷ったら伏せる。ネットワーク失敗・異常応答・タイムアウトも伏せる
+- 判定モデルは候補を**追加できない**。正規表現が見つけたものを裁定するだけ
+- 実測: `sha256=sk_HDVL…`（正規表現の誤検知）は hash 0.97 で解除、`xai-…` の本物の鍵は 0.07 で条件に届かず伏せたまま
+- 1 候補 = 1 リクエスト（d1-3B で約 40ms）。候補が多いファイルは遅くなる
+
 ## インストール
 
 ```sh
@@ -78,7 +99,7 @@ plugin_manager install_bundle target=<clone したディレクトリの絶対パ
 ## テスト
 
 ```sh
-npm test                      # 30 テスト
+npm test                      # 43 テスト
 node scripts/scan.mjs ~/dev   # 誤検知スキャン（一致した値は出力しない）
 ```
 
@@ -89,7 +110,8 @@ node scripts/scan.mjs ~/dev   # 誤検知スキャン（一致した値は出力
 | ファイル | 役割 |
 |---|---|
 | `index.js` | リスナー登録とプロンプトセクション |
-| `lib/redact.js` | 判定・置換ロジック |
+| `lib/redact.js` | 検出・置換ロジック |
+| `lib/judge.js` | 判定モデルへの問い合わせ（任意） |
 | `cordis.patch.yml` | バンドルのパッチ（insert 1 行） |
 | `scripts/scan.mjs` | 誤検知スキャン |
 | `test/` | コーパスとユニットテスト |
