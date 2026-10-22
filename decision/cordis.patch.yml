@@ -1,0 +1,10 @@
+- insert:
+    - id: decision
+      name: dsh-decision
+      config:
+        endpoints:
+          - name: d1
+            url: http://127.0.0.1:8081/v1/systemone
+          - name: jev
+            url: http://127.0.0.1:8788/v1/systemone
+        defaultEndpoint: d1

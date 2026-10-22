@@ -11,7 +11,7 @@ import {
   redactToolResult,
   redactTokens,
 } from '../lib/redact.js'
-import { apply } from '../index.js'
+import { DEFAULT_ENDPOINT, apply, resolveJudgeConfig } from '../index.js'
 
 /** A context that records listeners instead of mounting a Cordis runtime. */
 function fakeContext() {
@@ -45,7 +45,7 @@ function readResult(lines, path = '/app/.env') {
   }
 }
 
-test('isSecretPath matches dotenv names only', () => {
+test('isSecretPath matches dotenv names only', async () => {
   for (const path of ['.env', 'app/.env', '/srv/app/.env.local', '.env.production', 'prod.env', 'A\\.ENV']) {
     assert.equal(isSecretPath(path), true, path)
   }
@@ -54,7 +54,7 @@ test('isSecretPath matches dotenv names only', () => {
   }
 })
 
-test('redactEnvLine keeps the key and replaces every value with the marker', () => {
+test('redactEnvLine keeps the key and replaces every value with the marker', async () => {
   assert.equal(redactEnvLine('API_KEY=sk-live-123'), `API_KEY=${MARKER}`)
   assert.equal(redactEnvLine('  export DB_URL="postgres://user:pw@host/db"'), `  DB_URL=${MARKER}`)
   assert.equal(redactEnvLine('EMPTY='), `EMPTY=${MARKER}`)
@@ -65,7 +65,7 @@ test('redactEnvLine keeps the key and replaces every value with the marker', () 
   assert.equal(redactEnvLine('BARE_VALUE_WITHOUT_KEY'), `# ${MARKER}`)
 })
 
-test('redactTokens replaces only the key and keeps everything around it', () => {
+test('redactTokens replaces only the key and keeps everything around it', async () => {
   assert.equal(
     redactTokens('const key = "sk-test-1234567890abcdef"; // keep me'),
     'const key = "sk-removed-by-plugin"; // keep me',
@@ -82,7 +82,7 @@ test('redactTokens replaces only the key and keeps everything around it', () => 
   )
 })
 
-test('redactTokens covers the provider prefixes, keeping each prefix', () => {
+test('redactTokens covers the provider prefixes, keeping each prefix', async () => {
   const cases = [
     ['ghp_0123456789abcdefghijABCDEFGHIJ012345', 'ghp_removed-by-plugin'],
     ['github_pat_0123456789abcdefghijABCDEFGHIJ', 'github_pat_removed-by-plugin'],
@@ -99,7 +99,7 @@ test('redactTokens covers the provider prefixes, keeping each prefix', () => {
   assert.equal(redactTokens('key=AKIAIOSFODNN7EXAMPLE;'), 'key=AKIAremoved-by-plugin;')
 })
 
-test('redactTokens leaves look-alike text alone', () => {
+test('redactTokens leaves look-alike text alone', async () => {
   assert.equal(redactTokens('task-runner-1234567890'), 'task-runner-1234567890')
   assert.equal(redactTokens('disk-0123456789'), 'disk-0123456789')
   assert.equal(redactTokens('risk-0123456789'), 'risk-0123456789')
@@ -113,12 +113,12 @@ test('redactTokens leaves look-alike text alone', () => {
   assert.equal(redactTokens('no keys here'), 'no keys here')
 })
 
-test('redactTokens is idempotent', () => {
+test('redactTokens is idempotent', async () => {
   const once = redactTokens('key: sk-test-1234567890abcdef ghp_0123456789abcdefghijABCDEFGHIJ012345')
   assert.equal(redactTokens(once), once)
 })
 
-test('redactReadValue preserves the read-window shape', () => {
+test('redactReadValue preserves the read-window shape', async () => {
   const value = readResult([
     { number: 1, text: 'API_KEY=secret' },
     { number: 2, text: '# note' },
@@ -138,7 +138,7 @@ test('redactReadValue preserves the read-window shape', () => {
   assert.equal(value.lines[0].text, 'API_KEY=secret', 'the source value must not be mutated')
 })
 
-test('redactReadValue removes keys from ordinary files', () => {
+test('redactReadValue removes keys from ordinary files', async () => {
   const value = readResult(
     [
       { number: 8, text: 'const key = "sk-test-1234567890abcdef" // keep' },
@@ -159,7 +159,7 @@ test('redactReadValue removes keys from ordinary files', () => {
   })
 })
 
-test('redactReadValue collapses a whole private-key block', () => {
+test('redactReadValue collapses a whole private-key block', async () => {
   const value = readResult(
     [
       { number: 1, text: 'before' },
@@ -177,7 +177,7 @@ test('redactReadValue collapses a whole private-key block', () => {
   )
 })
 
-test('redactReadValue reports no change when there is nothing to redact', () => {
+test('redactReadValue reports no change when there is nothing to redact', async () => {
   assert.equal(redactReadValue({ path: '/app/.env', offset: 1, lines: [], totalLines: 0 }, true), undefined)
   assert.equal(redactReadValue({ kind: 'other' }), undefined)
   assert.equal(
@@ -186,7 +186,7 @@ test('redactReadValue reports no change when there is nothing to redact', () => 
   )
 })
 
-test('redactGrepValue uses the right rule per file', () => {
+test('redactGrepValue uses the right rule per file', async () => {
   const value = {
     matches: [
       { path: '.env', lineNumber: 1, line: 'TOKEN=sk-test-1234567890abcdef' },
@@ -205,8 +205,8 @@ test('redactGrepValue uses the right rule per file', () => {
   assert.equal(value.matches[0].line, 'TOKEN=sk-test-1234567890abcdef', 'the source value must not be mutated')
 })
 
-test('redactToolResult replaces the value of a dotenv read', () => {
-  const decision = redactToolResult(
+test('redactToolResult replaces the value of a dotenv read', async () => {
+  const decision = await redactToolResult(
     readExec('/app/.env'),
     readResult([{ number: 1, text: 'API_KEY=secret' }]),
     { kind: 'accept' },
@@ -216,8 +216,8 @@ test('redactToolResult replaces the value of a dotenv read', () => {
   assert.equal('content' in decision, false, 'value and content cannot both be replaced')
 })
 
-test('redactToolResult replaces keys in an ordinary file read', () => {
-  const decision = redactToolResult(
+test('redactToolResult replaces keys in an ordinary file read', async () => {
+  const decision = await redactToolResult(
     readExec('/app/src/config.ts'),
     readResult([{ number: 3, text: 'key = "sk-test-1234567890abcdef"' }], '/app/src/config.ts'),
     { kind: 'accept' },
@@ -225,18 +225,18 @@ test('redactToolResult replaces keys in an ordinary file read', () => {
   assert.deepEqual(decision.value.lines, [{ number: 3, text: 'key = "sk-removed-by-plugin"' }])
 })
 
-test('redactToolResult leaves unrelated calls alone', () => {
+test('redactToolResult leaves unrelated calls alone', async () => {
   const keep = { kind: 'accept' }
   assert.equal(
-    redactToolResult(readExec('README.md'), readResult([{ number: 1, text: 'API_KEY=x' }]), keep),
+    await redactToolResult(readExec('README.md'), readResult([{ number: 1, text: 'API_KEY=x' }]), keep),
     undefined,
   )
   assert.equal(
-    redactToolResult(readExec('/app/.env'), { isError: true, error: new Error('boom') }, keep),
+    await redactToolResult(readExec('/app/.env'), { isError: true, error: new Error('boom') }, keep),
     undefined,
   )
   assert.equal(
-    redactToolResult(readExec('/app/.env'), readResult([{ number: 1, text: 'API_KEY=x' }]), {
+    await redactToolResult(readExec('/app/.env'), readResult([{ number: 1, text: 'API_KEY=x' }]), {
       kind: 'block',
       feedback: [],
     }),
@@ -244,9 +244,9 @@ test('redactToolResult leaves unrelated calls alone', () => {
   )
 })
 
-test('redactToolResult keeps additional contexts from the inner decision', () => {
+test('redactToolResult keeps additional contexts from the inner decision', async () => {
   const extra = [{ role: 'user', content: [] }]
-  const decision = redactToolResult(
+  const decision = await redactToolResult(
     readExec('/app/.env'),
     readResult([{ number: 1, text: 'API_KEY=secret' }]),
     { kind: 'accept', additionalContexts: extra },
@@ -254,8 +254,8 @@ test('redactToolResult keeps additional contexts from the inner decision', () =>
   assert.equal(decision.additionalContexts, extra)
 })
 
-test('every other tool result is masked at the content level', () => {
-  const decision = redactToolResult(
+test('every other tool result is masked at the content level', async () => {
+  const decision = await redactToolResult(
     { name: 'bash', arguments: { command: 'env' } },
     {
       isError: false,
@@ -268,9 +268,9 @@ test('every other tool result is masked at the content level', () => {
   assert.equal('value' in decision, false, 'content replacement keeps the canonical value untouched')
 })
 
-test('content masking leaves non-text blocks alone', () => {
+test('content masking leaves non-text blocks alone', async () => {
   const image = { type: 'image', attachment: { attachmentId: 'x' } }
-  const decision = redactToolResult(
+  const decision = await redactToolResult(
     { name: 'web_fetch', arguments: { url: 'https://example.com' } },
     {
       isError: false,
@@ -283,9 +283,9 @@ test('content masking leaves non-text blocks alone', () => {
   assert.equal(decision.content[1].text, 'ghp_removed-by-plugin')
 })
 
-test('a PEM block inside a tool result collapses', () => {
+test('a PEM block inside a tool result collapses', async () => {
   const text = 'run\n-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----\ndone'
-  const decision = redactToolResult(
+  const decision = await redactToolResult(
     { name: 'bash', arguments: { command: 'cat key' } },
     { isError: false, value: {}, content: [{ type: 'text', text }] },
     { kind: 'accept' },
@@ -293,8 +293,8 @@ test('a PEM block inside a tool result collapses', () => {
   assert.equal(decision.content[0].text, `run\n${PRIVATE_KEY_MARKER}\ndone`)
 })
 
-test('a tool call that names a dotenv file masks every value', () => {
-  const decision = redactToolResult(
+test('a tool call that names a dotenv file masks every value', async () => {
+  const decision = await redactToolResult(
     { name: 'bash', arguments: { command: 'cat /srv/app/.env' } },
     {
       isError: false,
@@ -306,7 +306,7 @@ test('a tool call that names a dotenv file masks every value', () => {
   assert.equal(decision.content[0].text, `API_KEY=${MARKER}\n# ${MARKER}\nDEBUG=${MARKER}\n`)
 })
 
-test('process.env does not count as a dotenv reference', () => {
+test('process.env does not count as a dotenv reference', async () => {
   assert.equal(mentionsEnvFile({ command: 'node -e "console.log(process.env)"' }), false)
   assert.equal(mentionsEnvFile({ command: 'echo .envrc' }), false)
   assert.equal(mentionsEnvFile({ command: 'cat .env' }), true)
@@ -314,7 +314,7 @@ test('process.env does not count as a dotenv reference', () => {
   assert.equal(mentionsEnvFile({ command: 'cat config/prod.env' }), true)
   assert.equal(mentionsEnvFile({ nested: [{ content: 'source .env.local' }] }), true)
 
-  const decision = redactToolResult(
+  const decision = await redactToolResult(
     { name: 'bash', arguments: { command: 'node -e "console.log(process.env)"' } },
     { isError: false, value: {}, content: [{ type: 'text', text: 'HOME=/home/user' }] },
     { kind: 'accept' },
@@ -322,8 +322,8 @@ test('process.env does not count as a dotenv reference', () => {
   assert.equal(decision, undefined)
 })
 
-test('a command that only mentions a dotenv path keeps unrelated output', () => {
-  const decision = redactToolResult(
+test('a command that only mentions a dotenv path keeps unrelated output', async () => {
+  const decision = await redactToolResult(
     { name: 'bash', arguments: { command: 'python3 edit.py README.md  # mentions cat .env' } },
     {
       isError: false,
@@ -335,16 +335,53 @@ test('a command that only mentions a dotenv path keeps unrelated output', () => 
   assert.equal(decision, undefined)
 })
 
-test('a clean result is left untouched', () => {
+test('a clean result is left untouched', async () => {
   const inner = { kind: 'accept', content: [{ type: 'text', text: 'ok' }] }
   assert.equal(
-    redactToolResult(
+    await redactToolResult(
       { name: 'bash', arguments: {} },
       { isError: false, value: {}, content: [{ type: 'text', text: 'ok' }] },
       inner,
     ),
     undefined,
   )
+})
+
+test('the judge can clear a match it is confident is not a credential', async () => {
+  const seen = []
+  const decision = await redactToolResult(
+    { name: 'read', arguments: { file_path: '/app/notes.md' } },
+    readResult([{ number: 1, text: 'sha256=sk_HDVL0123456789abcdef' }], '/app/notes.md'),
+    { kind: 'accept' },
+    async (candidates) => {
+      seen.push(...candidates)
+      return [false]
+    },
+  )
+  assert.equal(decision, undefined)
+  assert.deepEqual(seen, [{ line: 'sha256=sk_HDVL0123456789abcdef', token: 'sk_HDVL0123456789abcdef' }])
+})
+
+test('the judge keeps a match it calls a credential', async () => {
+  const decision = await redactToolResult(
+    { name: 'read', arguments: { file_path: '/app/notes.md' } },
+    readResult([{ number: 1, text: 'key=sk-0123456789abcdef' }], '/app/notes.md'),
+    { kind: 'accept' },
+    async () => [true],
+  )
+  assert.equal(decision.value.lines[0].text, 'key=sk-removed-by-plugin')
+})
+
+test('a throwing judge leaves every match masked', async () => {
+  const decision = await redactToolResult(
+    { name: 'bash', arguments: { command: 'cat x' } },
+    { isError: false, value: {}, content: [{ type: 'text', text: 'X=sk-0123456789abcdef' }] },
+    { kind: 'accept' },
+    async () => {
+      throw new Error('boom')
+    },
+  )
+  assert.equal(decision.content[0].text, 'X=sk-removed-by-plugin')
 })
 
 test('the plugin redacts through the tools/post-execute listener', async () => {
@@ -370,4 +407,23 @@ test('the plugin passes unrelated results through unchanged', async () => {
     await handler(readExec('src/app.ts'), readResult([{ number: 1, text: 'const n = 1' }]), async () => inner),
     inner,
   )
+})
+
+test('volatile references are read through get()', () => {
+  // Loader hands a `.volatile()` field over as a live reference, not a value.
+  const ref = (value) => ({ get: () => value })
+  const resolved = resolveJudgeConfig({ judge: { enabled: ref(true), endpoint: ref('http://x/v1/systemone'), timeoutMs: ref(1500) } })
+  assert.deepEqual(resolved, { endpoint: 'http://x/v1/systemone', timeoutMs: 1500 })
+
+  assert.equal(resolveJudgeConfig({ judge: { enabled: ref(false) } }), undefined)
+  assert.equal(resolveJudgeConfig(undefined), undefined)
+  assert.equal(resolveJudgeConfig({}), undefined)
+})
+
+test('plain values and missing fields also resolve', () => {
+  assert.deepEqual(resolveJudgeConfig({ judge: { enabled: true } }), {
+    endpoint: DEFAULT_ENDPOINT,
+    timeoutMs: 3000,
+  })
+  assert.equal(resolveJudgeConfig({ judge: { enabled: 'yes' } }), undefined)
 })

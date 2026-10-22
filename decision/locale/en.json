@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Decision",
+    "description": "Asks a local Jev or d1 System One endpoint for a typed decision."
+  }
+}

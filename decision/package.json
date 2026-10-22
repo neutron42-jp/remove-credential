@@ -1,0 +1,19 @@
+{
+  "name": "dsh-decision",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DSH Host plugin that asks a local Jev / d1 System One endpoint for typed decisions.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": ["index.js", "lib", "cordis.patch.yml", "locale/*.json", "icon.svg", "README.md"],
+  "scripts": { "test": "node --test" },
+  "dependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
+    "@deepseek-ai/schemastery": "^3.18.5"
+  },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}
