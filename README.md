@@ -2,6 +2,8 @@
 
 DSH (DeepSeek Harness) の Host プラグイン。モデルが `.env` を読もうとすると、**値を `deleted by plugin: remove-credential` に置き換えてキー名だけ渡す**。
 
+![before / after: .env on disk と、モデルが読む内容](docs/before-after.png)
+
 ```
 1: API_KEY=deleted by plugin: remove-credential
 2: DATABASE_URL=deleted by plugin: remove-credential
@@ -72,6 +74,8 @@ npm test        # node --test
 | `cordis.patch.yml` | バンドルのパッチ（insert 1 行） |
 | `locale/{en,ja}.json` | プラグイン一覧の表示名と説明 |
 | `icon.svg` | アイコン（黒塗り 1 行の書類） |
+| `docs/before-after.png` | README の before/after 図 |
+| `docs/diagram.py` | その図の生成スクリプト（`python3 docs/diagram.py`） |
 
 ## License
 
