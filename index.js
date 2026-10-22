@@ -2,12 +2,12 @@
  * Host half of the `remove-credential` bundle.
  *
  * The plugin adds no service and opens no file. It listens to the
- * `tools/post-execute` waterfall, and when a settled `read` or `grep` call
- * touched a dotenv file it answers with a `value` replacement: key names only,
- * every value removed. Replacing the value (instead of only the rendered
- * content) makes the registry re-render the model-facing text and re-project the
- * persisted metadata from the redacted copy, so a programmatic caller cannot
- * retrieve the original either.
+ * `tools/post-execute` waterfall and answers a settled `read` or `grep` with a
+ * `value` replacement: dotenv files keep only key names, and `sk-` API keys are
+ * replaced in every file. Replacing the value
+ * (instead of only the rendered content) makes the registry re-render the
+ * model-facing text and re-project the persisted metadata from the redacted
+ * copy, so a programmatic caller cannot retrieve the original either.
  *
  * @module remove-credential
  */
@@ -22,9 +22,9 @@ const FALLBACK_ORDER = 1101
  */
 const SECTION = {
   name: 'REMOVE_CREDENTIAL',
-  text: `### Credential files
+  text: `### Credential redaction
 
-\`read\` and \`grep\` show dotenv files (\`.env\`, \`.env.*\`, \`*.env\`) with every value replaced by the marker \`deleted by plugin: remove-credential\`: an assignment appears as \`KEY=deleted by plugin: remove-credential\`, and comments or continuation lines appear as \`# deleted by plugin: remove-credential\`. The real values remain on disk. Do not guess or reconstruct them, and do not rewrite such a file to fill in what looks missing.`,
+Dotenv files (\`.env\`, \`.env.*\`, \`*.env\`) are shown with every value replaced by \`deleted by plugin: remove-credential\`. In every file, API keys such as \`sk-\u2026\` are replaced by \`sk-removed-by-plugin\`. The real values remain on disk. Do not guess or reconstruct them, and do not rewrite a file to fill in what looks missing.`,
 }
 
 /**

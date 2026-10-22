@@ -1,6 +1,6 @@
 # remove-credential
 
-DSH (DeepSeek Harness) の Host プラグイン。モデルが `.env` を読もうとすると、**値を `deleted by plugin: remove-credential` に置き換えてキー名だけ渡す**。
+DSH (DeepSeek Harness) の Host プラグイン。モデルがファイルを読むとき、**`.env` は値を消してキー名だけ**を渡し、**それ以外のファイルは `sk-` の API キーを `sk-removed-by-plugin` に置き換える**。
 
 ![before / after: .env on disk と、モデルが読む内容](docs/before-after.png)
 
@@ -13,12 +13,21 @@ DSH (DeepSeek Harness) の Host プラグイン。モデルが `.env` を読も�
 
 ディスク上のファイルは一切変更しない。消えるのはモデルに渡るテキストと、セッションログに残る結果だけ。
 
+`.env` 以外のファイルでも、`sk-` で始まる API キーはキー部分だけ置き換える:
+
+```diff
+- const key = "sk-test-1234567890abcdef"; // keep me
++ const key = "sk-removed-by-plugin"; // keep me
+```
+
+置き換えるのはキーそのものだけで、前後の引用符・カンマ・行の残りはそのまま残る。`task-runner` や `sk-learn` のような語は一致しない（`sk-` の直前が英数字なら対象外、後続は 10 文字以上）。
+
 ## 仕組み
 
 `tools/post-execute` の waterfall で、確定した `read` / `grep` の結果を見る。
 
-- **`read`**: `file_path` の basename が `.env` / `.env.*` / `*.env` なら、canonical value の `lines[].text` を「キー + マーカー」に置き換える。
-- **`grep`**: `matches[]` のうち dotenv ファイル由来の行だけ同じルールで置き換える。他のファイルの行はそのまま。
+- **`read`**: basename が `.env` / `.env.*` / `*.env` なら値を「キー + マーカー」に、それ以外のファイルなら `sk-` キーだけを置き換える。
+- **`grep`**: `matches[]` を 1 行ずつ、そのファイルに応じたルールで置き換える。
 
 置き換えるのは `content` ではなく **`value`**。registry が value から本文と `presentationMeta` を再生成するので、モデル向けテキスト・セッションログ・UI カード・PTC のプログラム呼び出しのどこにも元の値が残らない。
 
@@ -34,7 +43,7 @@ DSH (DeepSeek Harness) の Host プラグイン。モデルが `.env` を読も�
 
 空の `KEY=` にすると「値が空の本物の行」に見えて書き戻しを誘うので、削除したことが分かるマーカーを値の位置に置く。マーカー文字列は `lib/redact.js` の `MARKER`。
 
-`systemPrompt` があるプロファイルでは、`read` の説明直後に短いセクションを足して「値がマーカーに置き換わっているのは仕様であり、推測・復元・書き戻しをしない」とモデルに伝える。
+`systemPrompt` があるプロファイルでは、`read` の説明直後に短いセクションを足して「置き換わっているのは仕様であり、推測・復元・書き戻しをしない」とモデルに伝える。
 
 ## インストール
 
@@ -60,7 +69,9 @@ npm test        # node --test
 
 ## 制限
 
-- **`bash` / `terminal` は対象外**。`cat .env` は止められない。塞ぐなら別途 `tools/pre-execute` で bash を拒否するポリシーが要る。
+- **`sk-` 系のみ**。`ghp_`・`AKIA`・`AIza`・JWT など他の形式は素通りする（`lib/redact.js` の `TOKEN_RULES` に足せば対応）。
+- **`bash` / `terminal` は対象外**。`cat .env` や `curl` の出力は止められない。塞ぐなら別途 `tools/pre-execute` で bash を拒否するポリシーが要る。
+- **ツール引数（入力）は書き換えない**。registry に引数書き換えの口がなく、できるのは拒否だけ。
 - **書き込みは止めない**。`write` / `edit` はそのまま通る。値が見えない状態で `.env` を書き換えると壊す危険はあるので、必要なら mutation guard を足す。
 - パターンは固定。変えたければ `lib/redact.js` の `ENV_NAME` を編集する。
 - 対応ツールは `read` と `grep` の 2 つ。ツール名が変わったら `lib/redact.js` の分岐も直す。

@@ -2,7 +2,7 @@
   "name": "remove-credential",
   "version": "0.1.0",
   "private": true,
-  "description": "DSH Host plugin that replaces .env values with their key names before the model sees them.",
+  "description": "DSH Host plugin that removes .env values and sk- API keys before the model sees them.",
   "type": "module",
   "exports": {
     ".": "./index.js",
@@ -22,6 +22,8 @@
     "test": "node --test"
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" }
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   }
 }

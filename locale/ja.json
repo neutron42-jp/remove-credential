@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Remove Credential",
-    "description": ".env の値を消してキー名だけをモデルに渡します。"
+    "description": "`.env` の値と、全ファイル中の `sk-` API キーをモデルに渡す前に置き換えます。"
   }
 }
