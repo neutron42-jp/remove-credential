@@ -24,9 +24,9 @@ import { redactToolResult } from './lib/redact.js'
 export const Config = z.object({
   judge: z
     .object({
-      enabled: z.boolean().default(false),
-      endpoint: z.string().default('http://127.0.0.1:8081/v1/systemone'),
-      timeoutMs: z.natural().default(3000),
+      enabled: z.boolean().default(false).volatile(),
+      endpoint: z.string().default('http://127.0.0.1:8081/v1/systemone').volatile(),
+      timeoutMs: z.natural().default(3000).volatile(),
     })
     .default({
       enabled: false,

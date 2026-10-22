@@ -8,10 +8,12 @@
     ".": "./index.js",
     "./redact": "./lib/redact.js",
     "./locale/*.json": "./locale/*.json",
-    "./icon": "./icon.svg"
+    "./icon": "./icon.svg",
+    "./client": "./client.js"
   },
   "files": [
     "index.js",
+    "client.js",
     "lib",
     "cordis.patch.yml",
     "locale/*.json",
@@ -24,6 +26,13 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": false,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-plugin-manager"
+      ]
     }
   },
   "dependencies": {

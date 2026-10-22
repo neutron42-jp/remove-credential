@@ -65,6 +65,8 @@ plain=ok
 
 設定で `judge.enabled` を入れると、正規表現が見つけた候補をローカルの Jev / d1（System One）に確認させる。4 択（資格情報 / ハッシュ / 識別子 / その他）で聞き、**確信を持って「資格情報ではない」と答えたときだけ**伏せ字を解除する。
 
+設定は **Plugins ページ → Remove Credential → 行の Configure** で編集する（`judge.*` は volatile フィールド）。
+
 | 設定 | 既定 | 意味 |
 |---|---|---|
 | `judge.enabled` | `false` | オフなら正規表現のみ（決定論的・サーバ不要） |
