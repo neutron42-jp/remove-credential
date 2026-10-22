@@ -2,7 +2,7 @@
   "name": "remove-credential",
   "version": "0.1.0",
   "private": true,
-  "description": "DSH Host plugin that removes .env values and sk- API keys before the model sees them.",
+  "description": "DSH Host plugin that masks .env values, API keys and private keys in every tool result.",
   "type": "module",
   "exports": {
     ".": "./index.js",

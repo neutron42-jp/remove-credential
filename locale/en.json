@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Remove Credential",
-    "description": "Replaces .env values and sk- API keys before the model sees them."
+    "description": "Masks .env values, API keys and private keys in every tool result before the model sees it."
   }
 }
